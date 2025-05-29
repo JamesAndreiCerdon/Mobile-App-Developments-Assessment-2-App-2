@@ -16,9 +16,15 @@ class CarAdapter(
 ) : RecyclerView.Adapter<CarAdapter.CarViewHolder>() {
 
     private var onFavoriteToggle: ((ToyotaCar, Boolean) -> Unit)? = null
+    private val favoriteStates = mutableMapOf<String, Boolean>()
 
     fun setOnFavoriteToggleListener(listener: (ToyotaCar, Boolean) -> Unit) {
         onFavoriteToggle = listener
+    }
+
+    fun updateFavoriteState(carName: String, isFavorite: Boolean) {
+        favoriteStates[carName] = isFavorite
+        notifyItemChanged(cars.indexOfFirst { it.name == carName })
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CarViewHolder {
@@ -45,6 +51,9 @@ class CarAdapter(
             carPrice.text = car.price
             itemView.setOnClickListener { onCarClick(car) }
             
+            // Set initial favorite state without triggering the listener
+            favoriteToggle.setOnCheckedChangeListener(null)
+            favoriteToggle.isChecked = favoriteStates[car.name] ?: false
             favoriteToggle.setOnCheckedChangeListener { _, isChecked ->
                 onFavoriteToggle?.invoke(car, isChecked)
             }

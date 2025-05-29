@@ -1,12 +1,12 @@
 package com.toyota.showcase
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.AppBarConfiguration
@@ -14,19 +14,19 @@ import androidx.navigation.ui.navigateUp
 import androidx.navigation.ui.onNavDestinationSelected
 import androidx.navigation.ui.setupActionBarWithNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.toyota.showcase.data.PreferencesManager
 import com.toyota.showcase.ui.activities.SearchActivity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var navController: NavController
     private lateinit var appBarConfiguration: AppBarConfiguration
-
-    companion object {
-        private const val PREFS_NAME = "app_preferences"
-        private const val KEY_NIGHT_MODE = "night_mode"
-    }
+    private lateinit var preferencesManager: PreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        preferencesManager = PreferencesManager(this)
         applyTheme()
         setContentView(R.layout.activity_main)
         setSupportActionBar(findViewById(R.id.toolbar))
@@ -48,12 +48,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyTheme() {
-        val preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val isNightMode = preferences.getBoolean(KEY_NIGHT_MODE, false)
-        AppCompatDelegate.setDefaultNightMode(
-            if (isNightMode) AppCompatDelegate.MODE_NIGHT_YES
-            else AppCompatDelegate.MODE_NIGHT_NO
-        )
+        lifecycleScope.launch {
+            val isNightMode = preferencesManager.isDarkMode.first()
+            AppCompatDelegate.setDefaultNightMode(
+                if (isNightMode) AppCompatDelegate.MODE_NIGHT_YES
+                else AppCompatDelegate.MODE_NIGHT_NO
+            )
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -74,22 +75,21 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             else -> {
-                // Let the Navigation component handle the menu item selection
                 item.onNavDestinationSelected(navController) || super.onOptionsItemSelected(item)
             }
         }
     }
 
     private fun toggleDarkMode() {
-        val preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val isCurrentlyNightMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
-        
-        preferences.edit().putBoolean(KEY_NIGHT_MODE, !isCurrentlyNightMode).apply()
-        
-        AppCompatDelegate.setDefaultNightMode(
-            if (isCurrentlyNightMode) AppCompatDelegate.MODE_NIGHT_NO
-            else AppCompatDelegate.MODE_NIGHT_YES
-        )
+        lifecycleScope.launch {
+            val isCurrentlyNightMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
+            preferencesManager.setDarkMode(!isCurrentlyNightMode)
+            
+            AppCompatDelegate.setDefaultNightMode(
+                if (isCurrentlyNightMode) AppCompatDelegate.MODE_NIGHT_NO
+                else AppCompatDelegate.MODE_NIGHT_YES
+            )
+        }
     }
 
     private fun updateThemeIcon(menuItem: MenuItem) {

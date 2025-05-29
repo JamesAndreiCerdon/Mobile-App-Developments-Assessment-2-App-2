@@ -1,28 +1,28 @@
 package com.toyota.showcase.ui
 
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.toyota.showcase.R
+import com.toyota.showcase.data.PreferencesManager
 import com.toyota.showcase.databinding.FragmentMainBinding
 import com.toyota.showcase.model.ToyotaCar
 import com.toyota.showcase.ui.adapters.CarAdapter
 import com.toyota.showcase.ui.activities.CarDetailsActivity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 class MainFragment : Fragment() {
     private var _binding: FragmentMainBinding? = null
     private val binding get() = _binding!!
     private lateinit var carAdapter: CarAdapter
-
-    companion object {
-        private const val PREFS_NAME = "favorites_prefs"
-    }
+    private lateinit var preferencesManager: PreferencesManager
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -30,6 +30,7 @@ class MainFragment : Fragment() {
         savedInstanceState: Bundle?
     ): View {
         _binding = FragmentMainBinding.inflate(inflater, container, false)
+        preferencesManager = PreferencesManager(requireContext())
         return binding.root
     }
 
@@ -49,17 +50,20 @@ class MainFragment : Fragment() {
         binding.carsRecyclerView.apply {
             layoutManager = LinearLayoutManager(context)
             adapter = carAdapter
-            
-            // Set up click listener for favorite buttons
-            (adapter as CarAdapter).setOnFavoriteToggleListener { car, isFavorite ->
-                val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs.edit().putBoolean(car.name, isFavorite).apply()
-            }
         }
 
         carAdapter.setOnFavoriteToggleListener { car, isFavorite ->
-            val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs.edit().putBoolean(car.name, isFavorite).apply()
+            viewLifecycleOwner.lifecycleScope.launch {
+                preferencesManager.setFavorite(car.name, isFavorite)
+            }
+        }
+
+        // Load initial favorite states
+        viewLifecycleOwner.lifecycleScope.launch {
+            ToyotaCar.getSampleCars().forEach { car ->
+                val isFavorite = preferencesManager.isFavorite(car.name).first()
+                carAdapter.updateFavoriteState(car.name, isFavorite)
+            }
         }
     }
 
