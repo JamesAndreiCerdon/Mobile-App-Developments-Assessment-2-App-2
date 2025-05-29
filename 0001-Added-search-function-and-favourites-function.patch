@@ -1,0 +1,403 @@
+From 06c9bed69c8853124b485b701b85a76e9e95e03e Mon Sep 17 00:00:00 2001
+From: samth <samthirdy.2020@gmail.com>
+Date: Thu, 29 May 2025 19:41:16 +0400
+Subject: [PATCH] Added search function and favourites function
+
+---
+ app/build.gradle                              |  3 +
+ .../java/com/toyota/showcase/MainActivity.kt  | 44 ++++++-------
+ .../showcase/data/PreferencesManager.kt       | 53 ++++++++++++++++
+ .../toyota/showcase/ui/FavoritesFragment.kt   | 62 +++++++++++--------
+ .../com/toyota/showcase/ui/MainFragment.kt    | 30 +++++----
+ .../toyota/showcase/ui/adapters/CarAdapter.kt |  9 +++
+ 6 files changed, 139 insertions(+), 62 deletions(-)
+ create mode 100644 app/src/main/java/com/toyota/showcase/data/PreferencesManager.kt
+
+diff --git a/app/build.gradle b/app/build.gradle
+index 3898b28..a4173a7 100644
+--- a/app/build.gradle
++++ b/app/build.gradle
+@@ -49,6 +49,9 @@ dependencies {
+     implementation 'androidx.navigation:navigation-fragment-ktx:2.7.7'
+     implementation 'androidx.navigation:navigation-ui-ktx:2.7.7'
+     
++    // DataStore Preferences
++    implementation 'androidx.datastore:datastore-preferences:1.0.0'
++    
+     testImplementation 'junit:junit:4.13.2'
+     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+diff --git a/app/src/main/java/com/toyota/showcase/MainActivity.kt b/app/src/main/java/com/toyota/showcase/MainActivity.kt
+index bb1dccf..443d668 100644
+--- a/app/src/main/java/com/toyota/showcase/MainActivity.kt
++++ b/app/src/main/java/com/toyota/showcase/MainActivity.kt
+@@ -1,12 +1,12 @@
+ package com.toyota.showcase
+ 
+-import android.content.Context
+ import android.content.Intent
+ import android.os.Bundle
+ import android.view.Menu
+ import android.view.MenuItem
+ import androidx.appcompat.app.AppCompatActivity
+ import androidx.appcompat.app.AppCompatDelegate
++import androidx.lifecycle.lifecycleScope
+ import androidx.navigation.NavController
+ import androidx.navigation.fragment.NavHostFragment
+ import androidx.navigation.ui.AppBarConfiguration
+@@ -14,19 +14,19 @@ import androidx.navigation.ui.navigateUp
+ import androidx.navigation.ui.onNavDestinationSelected
+ import androidx.navigation.ui.setupActionBarWithNavController
+ import com.google.android.material.dialog.MaterialAlertDialogBuilder
++import com.toyota.showcase.data.PreferencesManager
+ import com.toyota.showcase.ui.activities.SearchActivity
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.launch
+ 
+ class MainActivity : AppCompatActivity() {
+     private lateinit var navController: NavController
+     private lateinit var appBarConfiguration: AppBarConfiguration
+-
+-    companion object {
+-        private const val PREFS_NAME = "app_preferences"
+-        private const val KEY_NIGHT_MODE = "night_mode"
+-    }
++    private lateinit var preferencesManager: PreferencesManager
+ 
+     override fun onCreate(savedInstanceState: Bundle?) {
+         super.onCreate(savedInstanceState)
++        preferencesManager = PreferencesManager(this)
+         applyTheme()
+         setContentView(R.layout.activity_main)
+         setSupportActionBar(findViewById(R.id.toolbar))
+@@ -48,12 +48,13 @@ class MainActivity : AppCompatActivity() {
+     }
+ 
+     private fun applyTheme() {
+-        val preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+-        val isNightMode = preferences.getBoolean(KEY_NIGHT_MODE, false)
+-        AppCompatDelegate.setDefaultNightMode(
+-            if (isNightMode) AppCompatDelegate.MODE_NIGHT_YES
+-            else AppCompatDelegate.MODE_NIGHT_NO
+-        )
++        lifecycleScope.launch {
++            val isNightMode = preferencesManager.isDarkMode.first()
++            AppCompatDelegate.setDefaultNightMode(
++                if (isNightMode) AppCompatDelegate.MODE_NIGHT_YES
++                else AppCompatDelegate.MODE_NIGHT_NO
++            )
++        }
+     }
+ 
+     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+@@ -74,22 +75,21 @@ class MainActivity : AppCompatActivity() {
+                 true
+             }
+             else -> {
+-                // Let the Navigation component handle the menu item selection
+                 item.onNavDestinationSelected(navController) || super.onOptionsItemSelected(item)
+             }
+         }
+     }
+ 
+     private fun toggleDarkMode() {
+-        val preferences = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+-        val isCurrentlyNightMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
+-        
+-        preferences.edit().putBoolean(KEY_NIGHT_MODE, !isCurrentlyNightMode).apply()
+-        
+-        AppCompatDelegate.setDefaultNightMode(
+-            if (isCurrentlyNightMode) AppCompatDelegate.MODE_NIGHT_NO
+-            else AppCompatDelegate.MODE_NIGHT_YES
+-        )
++        lifecycleScope.launch {
++            val isCurrentlyNightMode = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES
++            preferencesManager.setDarkMode(!isCurrentlyNightMode)
++            
++            AppCompatDelegate.setDefaultNightMode(
++                if (isCurrentlyNightMode) AppCompatDelegate.MODE_NIGHT_NO
++                else AppCompatDelegate.MODE_NIGHT_YES
++            )
++        }
+     }
+ 
+     private fun updateThemeIcon(menuItem: MenuItem) {
+diff --git a/app/src/main/java/com/toyota/showcase/data/PreferencesManager.kt b/app/src/main/java/com/toyota/showcase/data/PreferencesManager.kt
+new file mode 100644
+index 0000000..8ae7963
+--- /dev/null
++++ b/app/src/main/java/com/toyota/showcase/data/PreferencesManager.kt
+@@ -0,0 +1,53 @@
++package com.toyota.showcase.data
++
++import android.content.Context
++import androidx.datastore.core.DataStore
++import androidx.datastore.preferences.core.Preferences
++import androidx.datastore.preferences.core.booleanPreferencesKey
++import androidx.datastore.preferences.core.edit
++import androidx.datastore.preferences.preferencesDataStore
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.map
++
++private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
++
++class PreferencesManager(private val context: Context) {
++
++    companion object {
++        private val NIGHT_MODE = booleanPreferencesKey("night_mode")
++        private fun favoriteKey(carName: String) = booleanPreferencesKey("favorite_$carName")
++    }
++
++    // Theme preferences
++    val isDarkMode: Flow<Boolean> = context.dataStore.data
++        .map { preferences ->
++            preferences[NIGHT_MODE] ?: false
++        }
++
++    suspend fun setDarkMode(enabled: Boolean) {
++        context.dataStore.edit { preferences ->
++            preferences[NIGHT_MODE] = enabled
++        }
++    }
++
++    // Favorites preferences
++    fun isFavorite(carName: String): Flow<Boolean> = context.dataStore.data
++        .map { preferences ->
++            preferences[favoriteKey(carName)] ?: false
++        }
++
++    suspend fun setFavorite(carName: String, isFavorite: Boolean) {
++        context.dataStore.edit { preferences ->
++            preferences[favoriteKey(carName)] = isFavorite
++        }
++    }
++
++    fun getAllFavorites(): Flow<Set<String>> = context.dataStore.data
++        .map { preferences ->
++            preferences.asMap()
++                .filterKeys { it.name.startsWith("favorite_") }
++                .filterValues { it as Boolean }
++                .mapKeys { it.key.name.removePrefix("favorite_") }
++                .keys
++        }
++} 
+\ No newline at end of file
+diff --git a/app/src/main/java/com/toyota/showcase/ui/FavoritesFragment.kt b/app/src/main/java/com/toyota/showcase/ui/FavoritesFragment.kt
+index f5edf64..52dbb84 100644
+--- a/app/src/main/java/com/toyota/showcase/ui/FavoritesFragment.kt
++++ b/app/src/main/java/com/toyota/showcase/ui/FavoritesFragment.kt
+@@ -1,26 +1,26 @@
+ package com.toyota.showcase.ui
+ 
+-import android.content.Context
+ import android.content.Intent
+ import android.os.Bundle
+ import android.view.LayoutInflater
+ import android.view.View
+ import android.view.ViewGroup
+ import androidx.fragment.app.Fragment
++import androidx.lifecycle.lifecycleScope
+ import androidx.recyclerview.widget.LinearLayoutManager
++import com.toyota.showcase.data.PreferencesManager
+ import com.toyota.showcase.databinding.ActivityFavoritesBinding
+ import com.toyota.showcase.model.ToyotaCar
+ import com.toyota.showcase.ui.adapters.CarAdapter
+ import com.toyota.showcase.ui.activities.CarDetailsActivity
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.launch
+ 
+ class FavoritesFragment : Fragment() {
+     private var _binding: ActivityFavoritesBinding? = null
+     private val binding get() = _binding!!
+     private lateinit var carAdapter: CarAdapter
+-
+-    companion object {
+-        private const val PREFS_NAME = "favorites_prefs"
+-    }
++    private lateinit var preferencesManager: PreferencesManager
+ 
+     override fun onCreateView(
+         inflater: LayoutInflater,
+@@ -28,42 +28,50 @@ class FavoritesFragment : Fragment() {
+         savedInstanceState: Bundle?
+     ): View {
+         _binding = ActivityFavoritesBinding.inflate(inflater, container, false)
++        preferencesManager = PreferencesManager(requireContext())
+         return binding.root
+     }
+ 
+     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+         super.onViewCreated(view, savedInstanceState)
+         setupRecyclerView()
+-        updateEmptyState()
+     }
+ 
+     private fun setupRecyclerView() {
+-        val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+-        val favoriteCars = ToyotaCar.getSampleCars().filter { car ->
+-            prefs.getBoolean(car.name, false)
+-        }
++        viewLifecycleOwner.lifecycleScope.launch {
++            val favoriteCarNames = preferencesManager.getAllFavorites().first()
++            val favoriteCars = ToyotaCar.getSampleCars().filter { car ->
++                favoriteCarNames.contains(car.name)
++            }
+ 
+-        carAdapter = CarAdapter(favoriteCars) { car ->
+-            val intent = Intent(requireContext(), CarDetailsActivity::class.java).apply {
+-                putExtra(CarDetailsActivity.EXTRA_CAR, car)
++            carAdapter = CarAdapter(favoriteCars) { car ->
++                val intent = Intent(requireContext(), CarDetailsActivity::class.java).apply {
++                    putExtra(CarDetailsActivity.EXTRA_CAR, car)
++                }
++                startActivity(intent)
+             }
+-            startActivity(intent)
+-        }
+ 
+-        binding.favoritesRecyclerView.apply {
+-            layoutManager = LinearLayoutManager(context)
+-            adapter = carAdapter
+-        }
++            binding.favoritesRecyclerView.apply {
++                layoutManager = LinearLayoutManager(context)
++                adapter = carAdapter
++            }
+ 
+-        carAdapter.setOnFavoriteToggleListener { car, isFavorite ->
+-            val editor = prefs.edit()
+-            editor.putBoolean(car.name, isFavorite).apply()
+-            
+-            // Refresh the list if a car is unfavorited
+-            if (!isFavorite) {
+-                setupRecyclerView()
+-                updateEmptyState()
++            carAdapter.setOnFavoriteToggleListener { car, isFavorite ->
++                viewLifecycleOwner.lifecycleScope.launch {
++                    preferencesManager.setFavorite(car.name, isFavorite)
++                    if (!isFavorite) {
++                        setupRecyclerView()
++                        updateEmptyState()
++                    }
++                }
+             }
++
++            // Set initial favorite states
++            favoriteCars.forEach { car ->
++                carAdapter.updateFavoriteState(car.name, true)
++            }
++
++            updateEmptyState()
+         }
+     }
+ 
+diff --git a/app/src/main/java/com/toyota/showcase/ui/MainFragment.kt b/app/src/main/java/com/toyota/showcase/ui/MainFragment.kt
+index a3bac8f..ca39d82 100644
+--- a/app/src/main/java/com/toyota/showcase/ui/MainFragment.kt
++++ b/app/src/main/java/com/toyota/showcase/ui/MainFragment.kt
+@@ -1,28 +1,28 @@
+ package com.toyota.showcase.ui
+ 
+-import android.content.Context
+ import android.content.Intent
+ import android.os.Bundle
+ import android.view.LayoutInflater
+ import android.view.View
+ import android.view.ViewGroup
+ import androidx.fragment.app.Fragment
++import androidx.lifecycle.lifecycleScope
+ import androidx.navigation.fragment.findNavController
+ import androidx.recyclerview.widget.LinearLayoutManager
+ import com.toyota.showcase.R
++import com.toyota.showcase.data.PreferencesManager
+ import com.toyota.showcase.databinding.FragmentMainBinding
+ import com.toyota.showcase.model.ToyotaCar
+ import com.toyota.showcase.ui.adapters.CarAdapter
+ import com.toyota.showcase.ui.activities.CarDetailsActivity
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.launch
+ 
+ class MainFragment : Fragment() {
+     private var _binding: FragmentMainBinding? = null
+     private val binding get() = _binding!!
+     private lateinit var carAdapter: CarAdapter
+-
+-    companion object {
+-        private const val PREFS_NAME = "favorites_prefs"
+-    }
++    private lateinit var preferencesManager: PreferencesManager
+ 
+     override fun onCreateView(
+         inflater: LayoutInflater,
+@@ -30,6 +30,7 @@ class MainFragment : Fragment() {
+         savedInstanceState: Bundle?
+     ): View {
+         _binding = FragmentMainBinding.inflate(inflater, container, false)
++        preferencesManager = PreferencesManager(requireContext())
+         return binding.root
+     }
+ 
+@@ -49,17 +50,20 @@ class MainFragment : Fragment() {
+         binding.carsRecyclerView.apply {
+             layoutManager = LinearLayoutManager(context)
+             adapter = carAdapter
+-            
+-            // Set up click listener for favorite buttons
+-            (adapter as CarAdapter).setOnFavoriteToggleListener { car, isFavorite ->
+-                val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+-                prefs.edit().putBoolean(car.name, isFavorite).apply()
+-            }
+         }
+ 
+         carAdapter.setOnFavoriteToggleListener { car, isFavorite ->
+-            val prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+-            prefs.edit().putBoolean(car.name, isFavorite).apply()
++            viewLifecycleOwner.lifecycleScope.launch {
++                preferencesManager.setFavorite(car.name, isFavorite)
++            }
++        }
++
++        // Load initial favorite states
++        viewLifecycleOwner.lifecycleScope.launch {
++            ToyotaCar.getSampleCars().forEach { car ->
++                val isFavorite = preferencesManager.isFavorite(car.name).first()
++                carAdapter.updateFavoriteState(car.name, isFavorite)
++            }
+         }
+     }
+ 
+diff --git a/app/src/main/java/com/toyota/showcase/ui/adapters/CarAdapter.kt b/app/src/main/java/com/toyota/showcase/ui/adapters/CarAdapter.kt
+index 2709e67..daf7335 100644
+--- a/app/src/main/java/com/toyota/showcase/ui/adapters/CarAdapter.kt
++++ b/app/src/main/java/com/toyota/showcase/ui/adapters/CarAdapter.kt
+@@ -16,11 +16,17 @@ class CarAdapter(
+ ) : RecyclerView.Adapter<CarAdapter.CarViewHolder>() {
+ 
+     private var onFavoriteToggle: ((ToyotaCar, Boolean) -> Unit)? = null
++    private val favoriteStates = mutableMapOf<String, Boolean>()
+ 
+     fun setOnFavoriteToggleListener(listener: (ToyotaCar, Boolean) -> Unit) {
+         onFavoriteToggle = listener
+     }
+ 
++    fun updateFavoriteState(carName: String, isFavorite: Boolean) {
++        favoriteStates[carName] = isFavorite
++        notifyItemChanged(cars.indexOfFirst { it.name == carName })
++    }
++
+     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): CarViewHolder {
+         val view = LayoutInflater.from(parent.context)
+             .inflate(R.layout.item_car, parent, false)
+@@ -45,6 +51,9 @@ class CarAdapter(
+             carPrice.text = car.price
+             itemView.setOnClickListener { onCarClick(car) }
+             
++            // Set initial favorite state without triggering the listener
++            favoriteToggle.setOnCheckedChangeListener(null)
++            favoriteToggle.isChecked = favoriteStates[car.name] ?: false
+             favoriteToggle.setOnCheckedChangeListener { _, isChecked ->
+                 onFavoriteToggle?.invoke(car, isChecked)
+             }
+-- 
+2.45.1.windows.1
+
