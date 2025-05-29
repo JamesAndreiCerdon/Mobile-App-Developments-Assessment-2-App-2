@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Toyota Showcase</string>
+    <string name="toggle_theme">Toggle Theme</string>
+    <string name="car_image">Car Image</string>
+    <string name="specifications">Specifications</string>
+    <string name="pricing">Pricing</string>
+    <string name="welcome_title">Welcome to Toyota Showcase</string>
+    <string name="welcome_message">Explore our latest Toyota models and find your perfect car.</string>
+    <string name="welcome_button">Let\'s Start</string>
+    <string name="back">Back</string>
+    <string name="search_hint">Search…</string>
+    <string name="clear_search">Clear search</string>
+    <string name="no_results_found">No results found</string>
+</resources>

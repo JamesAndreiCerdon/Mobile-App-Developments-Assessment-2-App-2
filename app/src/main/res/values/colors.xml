@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- App Theme Colors -->
+    <color name="primary_blue">#0066CC</color>
+    <color name="primary_blue_light">#3B8AE5</color>
+    <color name="primary_blue_dark">#004C99</color>
+    
+    <color name="secondary_purple">#6A0DAD</color>
+    <color name="secondary_purple_light">#8F2CD6</color>
+    <color name="secondary_purple_dark">#4A0082</color>
+
+    <!-- Material Theme Colors -->
+    <color name="md_theme_light_primary">@color/primary_blue</color>
+    <color name="md_theme_light_onPrimary">#FFFFFF</color>
+    <color name="md_theme_light_primaryContainer">@color/primary_blue_light</color>
+    <color name="md_theme_light_onPrimaryContainer">@color/primary_blue_dark</color>
+    <color name="md_theme_light_secondary">@color/secondary_purple</color>
+    <color name="md_theme_light_onSecondary">#FFFFFF</color>
+    <color name="md_theme_light_secondaryContainer">@color/secondary_purple_light</color>
+    <color name="md_theme_light_onSecondaryContainer">@color/secondary_purple_dark</color>
+    <color name="md_theme_light_background">#FDFCFF</color>
+    <color name="md_theme_light_onBackground">#1A1C1E</color>
+    <color name="md_theme_light_surface">#FDFCFF</color>
+    <color name="md_theme_light_onSurface">#1A1C1E</color>
+
+    <!-- Dark Theme Colors -->
+    <color name="md_theme_dark_primary">@color/primary_blue_light</color>
+    <color name="md_theme_dark_onPrimary">#FFFFFF</color>
+    <color name="md_theme_dark_primaryContainer">@color/primary_blue</color>
+    <color name="md_theme_dark_onPrimaryContainer">@color/primary_blue_light</color>
+    <color name="md_theme_dark_secondary">@color/secondary_purple_light</color>
+    <color name="md_theme_dark_onSecondary">#FFFFFF</color>
+    <color name="md_theme_dark_secondaryContainer">@color/secondary_purple</color>
+    <color name="md_theme_dark_onSecondaryContainer">@color/secondary_purple_light</color>
+    <color name="md_theme_dark_background">#1A1C1E</color>
+    <color name="md_theme_dark_onBackground">#E2E2E6</color>
+    <color name="md_theme_dark_surface">#1A1C1E</color>
+    <color name="md_theme_dark_onSurface">#E2E2E6</color>
+
+    <!-- Launcher Icon Colors -->
+    <color name="ic_launcher_background">@color/primary_blue</color>
+
+    <!-- Toyota Brand Colors -->
+    <color name="toyota_red">#FF0000</color>
+    <color name="toyota_red_container">#FFE5E5</color>
+    <color name="toyota_red_on_container">#CC0000</color>
+
+    <color name="toyota_gray">#666666</color>
+    <color name="toyota_gray_container">#F5F5F5</color>
+    <color name="toyota_gray_on_container">#333333</color>
+
+    <color name="toyota_blue">#0066CC</color>
+    <color name="toyota_blue_container">#E5F0FF</color>
+    <color name="toyota_blue_on_container">#004C99</color>
+
+    <color name="car_item_background">#F0F5FF</color>
+    <color name="splash_purple">#6A0DAD</color>
+</resources>
